@@ -125,7 +125,7 @@ DD/MM/YY - R$VALOR - NOME
 - `R$1.250,50 - Fornecedor ABC` (falta data)
 - `25/11 - R$1.250,50 - Fornecedor ABC` (formato de data incorreto)
 
-## 📁 Estrutura de Pastas
+## Estrutura de Pastas
 
 ```
 trello-cash-flow-analyzer/
@@ -142,7 +142,7 @@ trello-cash-flow-analyzer/
 └── README.md                 # Este arquivo
 ```
 
-## 🔧 Arquitetura
+## Arquitetura
 
 A aplicação segue a arquitetura modular com separação de responsabilidades:
 
@@ -224,7 +224,7 @@ A aplicação usa um sistema de logging com emojis para melhor visualização:
 - ❌ `log_error()`: Erros
 - ℹ️ `log_info()`: Informações gerais
 
-## 🤝 Contribuindo
+## Contribuindo
 
 1. Faça um Fork do projeto
 2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
@@ -241,7 +241,7 @@ Este projeto está licenciado sob a MIT License - veja o arquivo LICENSE para de
 Rafael Fernandes Loureiro Pereira 
 GitHub: [@rafaeloureiro](https://github.com/rafaeloureiro)
 
-## 🎯 Roadmap
+## Roadmap
 
 - [ ] Suporte a Streamlit para interface web
 - [ ] Gráficos de previsão de caixa
