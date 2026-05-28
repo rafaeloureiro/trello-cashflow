@@ -1,4 +1,4 @@
-# Trello Cash Flow Analyzer
+# Trello Cash Flow
 
 Aplicação Python para análise de fluxo de caixa baseada em boards do Trello. Coleta automaticamente informações de contas a pagar e gera relatórios visuais interativos em HTML.
 
