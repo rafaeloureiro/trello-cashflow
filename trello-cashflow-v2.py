@@ -316,7 +316,7 @@ else:
     start_date = today
     end_date = today + timedelta(days=6)
 
-# ── Busca de dados ────────────────────────────────────────────────
+# ── Busca de dados — ano atual ───────────────────────────────────
 with st.spinner("Conectando ao Trello…"):
     lists = analyzer.get_board_lists(BOARD_URL)
 
@@ -336,22 +336,67 @@ df_period = analyzer.filter_by_range(df_all, start_date, end_date)
 df_daily = analyzer.calculate_daily_totals(df_period, start_date, end_date)
 monthly_expenses = analyzer.calculate_monthly_expenses(df_all, today)
 
-# ── KPIs (melhoria #3) ────────────────────────────────────────────
-next7_total = df_period["valor"].sum() if not df_period.empty else 0.0
+# ── Busca de dados — mesmo período ano anterior (YoY) ────────────
+start_yoy = start_date.replace(year=start_date.year - 1)
+end_yoy   = end_date.replace(year=end_date.year - 1)
+today_yoy = today.replace(year=today.year - 1)
+
+list_ids_yoy = analyzer.identify_month_lists(lists, start_yoy, end_yoy)
+cards_yoy    = analyzer.get_cards_from_lists(list_ids_yoy)
+
+if cards_yoy:
+    df_all_yoy, _ = analyzer.parse_all_cards(cards_yoy)
+    monthly_expenses_yoy = analyzer.calculate_monthly_expenses(df_all_yoy, today_yoy)
+    period_total_yoy     = analyzer.filter_by_range(df_all_yoy, start_yoy, end_yoy)["valor"].sum()
+else:
+    monthly_expenses_yoy = None
+    period_total_yoy     = None
+
+def yoy_delta(current: float, previous: float | None) -> tuple:
+    """Retorna (delta_str, delta_color) para st.metric."""
+    if previous is None or previous == 0:
+        return None, None
+    pct = (current - previous) / previous * 100
+    arrow = "▲" if pct > 0 else "▼"
+    return f"{arrow} {abs(pct):.1f}% vs {today.year - 1}", pct
+
+# ── KPIs ──────────────────────────────────────────────────────────
+period_total = df_period["valor"].sum() if not df_period.empty else 0.0
 biggest_expense = df_period["valor"].max() if not df_period.empty else 0.0
 biggest_name = (
     df_period.loc[df_period["valor"].idxmax(), "nome"]
     if not df_period.empty else "—"
 )
 
+delta_month,  _ = yoy_delta(monthly_expenses, monthly_expenses_yoy)
+delta_period, _ = yoy_delta(period_total, period_total_yoy)
+
 col1, col2, col3 = st.columns(3)
-col1.metric("💰 Total gasto no mês", fmt_brl(monthly_expenses))
-col2.metric("📅 Total no período selecionado", fmt_brl(next7_total))
-col3.metric(
-    "🔺 Maior gasto individual",
-    fmt_brl(biggest_expense),
-    help=f"Referente a: {biggest_name}",
-)
+
+with col1:
+    st.metric(
+        label="📅 Gasto acumulado no mês (dia 1 → hoje)",
+        value=fmt_brl(monthly_expenses),
+        delta=delta_month,
+        delta_color="inverse",  # vermelho = subiu (gasto maior é ruim)
+        help=f"Comparado ao mesmo período de {today.year - 1}: {fmt_brl(monthly_expenses_yoy) if monthly_expenses_yoy else 'sem dados'}",
+    )
+
+with col2:
+    st.metric(
+        label="🗓️ Total no período selecionado",
+        value=fmt_brl(period_total),
+        delta=delta_period,
+        delta_color="inverse",
+        help=f"Comparado ao mesmo período de {today.year - 1}: {fmt_brl(period_total_yoy) if period_total_yoy else 'sem dados'}",
+    )
+
+with col3:
+    st.metric(
+        "🔺 Maior gasto individual",
+        fmt_brl(biggest_expense),
+        help=f"Referente a: {biggest_name}",
+    )
 
 st.divider()
 
