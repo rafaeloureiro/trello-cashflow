@@ -7,8 +7,7 @@ gráfico de fornecedores, cache, tratamento de erros robusto.
 
 import re
 import pytz
-import re
-import pytzquests
+import requests
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
 import pandas as pd
