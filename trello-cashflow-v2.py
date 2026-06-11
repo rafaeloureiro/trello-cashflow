@@ -368,6 +368,8 @@ cards_yoy    = analyzer.get_cards_from_lists(list_ids_yoy)
 
 if cards_yoy:
     df_all_yoy, _ = analyzer.parse_all_cards(cards_yoy)
+    if excluded:
+        df_all_yoy = df_all_yoy[~df_all_yoy["nome"].isin(excluded)].copy()
     monthly_expenses_yoy = analyzer.calculate_monthly_expenses(df_all_yoy, today_yoy)
     period_total_yoy     = analyzer.filter_by_range(df_all_yoy, start_yoy, end_yoy)["valor"].sum()
 else:
