@@ -252,7 +252,7 @@ class TrelloCashFlowAnalyzer:
                 y=df_daily["saldo_acumulado"],
                 name="Saldo Acumulado",
                 mode="lines+markers",
-                line=dict(color="#DC2626", width=3, shape="spline"),
+                line=dict(color="#DC2626", width=3, shape="linear"),
                 marker=dict(size=10, color="#DC2626", line=dict(color="white", width=2)),
             ),
             secondary_y=True,
@@ -307,6 +307,9 @@ with st.sidebar:
         help="Selecione o intervalo de datas para visualizar os gastos.",
     )
     st.caption("💡 O cache é renovado a cada 10 minutos. Para forçar atualização, pressione **F5**.")
+    
+    # Placeholder — será preenchido após buscar os cards
+    exclusion_placeholder = st.empty()
 
 # Garante que o usuário selecionou as duas datas
 if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
@@ -332,6 +335,25 @@ if not cards:
     st.stop()
 
 df_all, df_invalidos = analyzer.parse_all_cards(cards)
+
+# ── Filtro de exclusão de categorias ─────────────────────────────
+DEFAULT_EXCLUDED = ["Retirada"]
+all_names = sorted(df_all["nome"].unique().tolist()) if not df_all.empty else []
+
+with exclusion_placeholder.container():
+    st.divider()
+    st.markdown("**🚫 Excluir categorias**")
+    excluded = st.multiselect(
+        label="Categorias ignoradas nos cálculos",
+        options=all_names,
+        default=[n for n in DEFAULT_EXCLUDED if n in all_names],
+        help="Cards com esses nomes não entram nos totais nem nos gráficos.",
+    )
+
+# Aplica o filtro em df_all antes de qualquer cálculo
+if excluded:
+    df_all = df_all[~df_all["nome"].isin(excluded)].copy()
+
 df_period = analyzer.filter_by_range(df_all, start_date, end_date)
 df_daily = analyzer.calculate_daily_totals(df_period, start_date, end_date)
 monthly_expenses = analyzer.calculate_monthly_expenses(df_all, today)
