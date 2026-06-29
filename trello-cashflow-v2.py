@@ -96,23 +96,17 @@ class TrelloCashFlowAnalyzer:
         return all_cards
 
     def parse_card_title(self, title: str) -> Tuple[Optional[Tuple], Optional[str]]:
-        """
-        Retorna (parsed_tuple, None) em caso de sucesso,
-        ou (None, motivo_do_erro) em caso de falha.
-        """
         title = title.strip()
         parts = [p.strip() for p in title.split("-", 2)]
 
         if len(parts) < 3:
             return None, "Formato inválido — esperado: DD/MM/AA - R$ valor - nome"
 
-        # Data
         try:
             date_obj = datetime.strptime(parts[0].strip(), "%d/%m/%y")
         except ValueError:
             return None, f"Data inválida: '{parts[0].strip()}' — use DD/MM/AA"
 
-        # Valor
         value_str = re.sub(r"[R$\s]", "", parts[1].strip()).replace(".", "").replace(",", ".")
         if not value_str:
             return None, "Valor ausente ou ilegível"
@@ -125,10 +119,6 @@ class TrelloCashFlowAnalyzer:
         return (date_obj, value, name), None
 
     def parse_all_cards(self, cards: List[Dict]) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """
-        Retorna (df_validos, df_invalidos).
-        df_invalidos contém titulo_original e motivo do erro.
-        """
         validos, invalidos = [], []
 
         for card in cards:
@@ -185,7 +175,6 @@ class TrelloCashFlowAnalyzer:
         return result
 
     def top_suppliers_chart(self, df: pd.DataFrame) -> go.Figure:
-        """Gráfico de barras horizontais com top fornecedores/categorias."""
         if df.empty:
             return go.Figure()
 
@@ -193,7 +182,7 @@ class TrelloCashFlowAnalyzer:
             df.groupby("nome")["valor"]
             .sum()
             .sort_values(ascending=True)
-            .tail(12)  # top 12
+            .tail(12)
         )
 
         fmt = lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -293,31 +282,42 @@ analyzer = TrelloCashFlowAnalyzer()
 if not analyzer.load_credentials():
     st.stop()
 
-# ── Seletor de período (melhoria #2) ──────────────────────────────
+# ── Seletor de período ──────────────────────────────
 BR_TZ = pytz.timezone("America/Sao_Paulo")
 today = datetime.now(tz=BR_TZ).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
 
+first_of_next = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+last_of_month = first_of_next - timedelta(days=1)
+min_date = (today - timedelta(days=730)).date()
+max_date = (today + timedelta(days=90)).date()
+
 with st.sidebar:
     st.header("⚙️ Configurações")
-    date_range = st.date_input(
-        "Período de análise",
-        value=(today.date(), today.replace(day=28).date()),  # default: resto do mês atual
-        min_value=(today - timedelta(days=730)).date(),  # até 2 anos atrás
-        max_value=(today + timedelta(days=90)).date(),
-        help="Selecione o intervalo de datas para visualizar os gastos.",
+    st.markdown("**📅 Período de análise**")
+    start_input = st.date_input(
+        "De",
+        value=today.date(),
+        min_value=min_date,
+        max_value=max_date,
+        key="start_date",
     )
+    end_input = st.date_input(
+        "Até",
+        value=last_of_month.date(),
+        min_value=min_date,
+        max_value=max_date,
+        key="end_date",
+    )
+    if end_input < start_input:
+        st.error("⚠️ A data final deve ser maior ou igual à inicial.")
+        st.stop()
     st.caption("💡 O cache é renovado a cada 10 minutos. Para forçar atualização, pressione **F5**.")
-    
+
     # Placeholder — será preenchido após buscar os cards
     exclusion_placeholder = st.empty()
 
-# Garante que o usuário selecionou as duas datas
-if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-    start_date = datetime.combine(date_range[0], datetime.min.time())
-    end_date = datetime.combine(date_range[1], datetime.min.time())
-else:
-    start_date = today
-    end_date = today + timedelta(days=6)
+start_date = datetime.combine(start_input, datetime.min.time())
+end_date = datetime.combine(end_input, datetime.min.time())
 
 # ── Busca de dados — ano atual ───────────────────────────────────
 with st.spinner("Conectando ao Trello…"):
@@ -377,7 +377,6 @@ else:
     period_total_yoy     = None
 
 def yoy_delta(current: float, previous: float | None) -> tuple:
-    """Retorna (delta_str, delta_color) para st.metric."""
     if previous is None or previous == 0:
         return None, None
     pct = (current - previous) / previous * 100
@@ -402,7 +401,7 @@ with col1:
         label="📅 Gasto acumulado no mês (dia 1 → hoje)",
         value=fmt_brl(monthly_expenses),
         delta=delta_month,
-        delta_color="inverse",  # vermelho = subiu (gasto maior é ruim)
+        delta_color="inverse",
         help=f"Comparado ao mesmo período de {today.year - 1}: {fmt_brl(monthly_expenses_yoy) if monthly_expenses_yoy else 'sem dados'}",
     )
 
@@ -428,14 +427,14 @@ st.divider()
 fig_flow = analyzer.generate_flow_chart(df_daily, monthly_expenses)
 st.plotly_chart(fig_flow, use_container_width=True)
 
-# ── Gráfico de fornecedores (melhoria #5) ────────────────────────
+# ── Gráfico de fornecedores ────────────────────────
 if not df_period.empty:
     fig_suppliers = analyzer.top_suppliers_chart(df_period)
     st.plotly_chart(fig_suppliers, use_container_width=True)
 
 st.divider()
 
-# ── Tabela detalhada (melhoria #4 — data formatada) ──────────────
+# ── Tabela detalhada ──────────────────────────────────────────────
 st.subheader("📋 Detalhamento dos Cards")
 
 if not df_period.empty:
@@ -449,7 +448,7 @@ if not df_period.empty:
 else:
     st.info("Nenhum card no período selecionado.")
 
-# ── Cards inválidos (melhoria #7) ─────────────────────────────────
+# ── Cards inválidos ─────────────────────────────────
 if not df_invalidos.empty:
     with st.expander(f"⚠️ {len(df_invalidos)} card(s) com formato inválido — clique para ver"):
         st.caption(
